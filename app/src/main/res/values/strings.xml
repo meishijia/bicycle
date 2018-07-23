@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">KeyGen</string>
+    <string name="title_activity_key_gen">KeyGenActivity</string>
+    <string name="title_activity_test">TestActivity</string>
+</resources>
