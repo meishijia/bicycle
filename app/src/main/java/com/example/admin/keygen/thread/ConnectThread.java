@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 
+import static com.example.admin.keygen.activity.MainActivity.END;
+import static com.example.admin.keygen.activity.MainActivity.END_INT;
 import static com.example.admin.keygen.activity.MainActivity.INFO_RECON_START;
 import static com.example.admin.keygen.activity.MainActivity.INFO_RECON_START_INT;
 import static com.example.admin.keygen.activity.MainActivity.KEY_GEN_FINISHED;
@@ -73,8 +75,9 @@ public class ConnectThread extends Thread{
                     try{
                         String content;
                         while ((content = bufferedReader.readLine()) != null){
-                            Log.d("ConnectThread","Thread in connect thread ,and receiced message");
-                            if (content.equals("Finish")) {
+                            Log.d("ConnectThread","Thread in connect thread ,and received message "+content);
+                            if (content.equals(END)) {
+                                Log.d("ConnectThread","connect thread received END message");
                                 socket.close();
                                 bufferedReader.close();
                                 outputStream.close();
@@ -88,27 +91,26 @@ public class ConnectThread extends Thread{
                                 // send(NTP_SYNC_FAILED) to server
                                 mainHandler.sendEmptyMessage(NTP_SYNC_REQUEST_INT);
                             }
+                            //only server will receive this message
+                            else if(content.equals(NTP_SYNC_SUCCESS)){
+                                mainHandler.sendEmptyMessage(NTP_SYNC_SUCCESS_INT);
+                            }
                             // only client will receive this message
                             else if(content.equals(KEY_GEN_START)){
                                 // send message to MainActivity
                                 mainHandler.sendEmptyMessage(KEY_GEN_START_INT);
+                            }
+                            //only server will receive this message
+                            else if(content.equals(KEY_GEN_FINISHED)){
+                                mainHandler.sendEmptyMessage(KEY_GEN_FINISHED_INT);
                             }
                             // only client will receive this message
                             else if(content.equals(INFO_RECON_START)){
                                 mainHandler.sendEmptyMessage(INFO_RECON_START_INT);
                             }
                             //only server will receive this message
-                            else if(content.equals(NTP_SYNC_SUCCESS)){
-                                mainHandler.sendEmptyMessage(NTP_SYNC_SUCCESS_INT);
-                            }
-                            //only server will receive this message
                             else if(content.equals(NTP_SYNC_FAILED)){
                                 mainHandler.sendEmptyMessage(NTP_SYNC_FAILED_INT);
-                            }
-                            //only server will receive this message
-                            else if(content.equals(KEY_GEN_FINISHED)){
-                                // send message to MainActivity
-                                mainHandler.sendEmptyMessage(KEY_GEN_FINISHED_INT);
                             }
                             else {
                                 Log.d("ConnectThread","Cannot recognize the content of message");
@@ -132,6 +134,16 @@ public class ConnectThread extends Thread{
                             e.printStackTrace();
                             Log.d("ConnectThread","Send message failed");
                         }
+                    }
+                    else if(msg.what == END_INT){
+                        try{
+                            socket.close();
+                            bufferedReader.close();
+                            outputStream.close();
+                        }catch (IOException e){
+                            e.printStackTrace();
+                        }
+
                     }
                 }
             };

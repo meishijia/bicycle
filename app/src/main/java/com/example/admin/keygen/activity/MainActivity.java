@@ -1,15 +1,19 @@
 package com.example.admin.keygen.activity;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.DhcpInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,6 +24,7 @@ import android.widget.Toast;
 
 import com.example.admin.keygen.R;
 import com.example.admin.keygen.thread.ConnectThread;
+import com.example.admin.keygen.thread.KeyGenThread;
 import com.example.admin.keygen.thread.ListenerThread;
 
 import java.io.BufferedReader;
@@ -48,17 +53,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public final static int NTP_SYNC_SUCCESS_INT = 32;
     public final static int NTP_SYNC_FAILED_INT = 33;
     public final static int KEY_GEN_START_INT = 34;
-    public final static int KEY_GEN_FINISHED_INT = 35;
-    public final static int INFO_RECON_START_INT = 36;
+    public final static int KEY_GEN_SUCCESS_INT =35;
+    public final static int KEY_GEN_FINISHED_INT = 36;
+    public final static int INFO_RECON_START_INT = 37;
+    public final static int END_INT = 38;
 
     public final static String NTP_SYNC_REQUEST = "NTP_SYNC_REQUEST";
     public final static String NTP_SYNC_SUCCESS = "NTP_SYNC_SUCCESS";
     public final static String NTP_SYNC_FAILED = "NTP_SYNC_FAILED";
 
     public final static String KEY_GEN_START = "KEY_GEN_START";
+    public final static String KEY_GEN_SUCCESS = "KEY_GEN_SUCCESS";
     public final static String KEY_GEN_FINISHED = "KEY_GEN_FINISHED";
 
     public final static String INFO_RECON_START = "IOFO_RECON_START";
+    public final static String END = "END";
 
 
     Button master;
@@ -66,6 +75,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button start;
     TextView textView;
     TextView character;
+    TextView keyTextView;
+    TextView progressTextView;
 
     boolean isMaster;
     boolean charChoosed = false;
@@ -77,6 +88,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private ConnectThread masterConnectThread;
     private MainHandler mainHandler;
 
+    public String rawKey;
 
     WifiManager wifiManager;
     BroadcastReceiver receiver;
@@ -95,10 +107,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         start = (Button)findViewById(R.id.start_button);
         textView = (TextView)findViewById(R.id.textView);
         character = (TextView)findViewById(R.id.character);
+        keyTextView = (TextView)findViewById(R.id.key_show);
+        progressTextView = (TextView)findViewById(R.id.progress_show);
 
         master.setOnClickListener(this);
         slave.setOnClickListener(this);
         start.setOnClickListener(this);
+
+        //申请读写SD卡的权限，否则将无法创建文件
+        if(ContextCompat.checkSelfPermission(MainActivity.this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE)!= PackageManager.PERMISSION_GRANTED){
+
+            ActivityCompat.requestPermissions(MainActivity.this,new String[]{
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+            },1);
+
+        }
 
         mainHandler = new MainHandler(MainActivity.this);
 
@@ -157,6 +181,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         };
 
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
+        switch (requestCode){
+            case 1:
+                if(grantResults.length > 0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                    return;
+                }
+                else{
+                    Toast.makeText(this,"You denied the permission",Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+        }
     }
 
     @Override
@@ -235,6 +274,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 Log.d("MainActivity","threadHandler is null");
                             }
                             masterConnectThread.threadHandler.sendMessage(getMessage(NTP_SYNC_REQUEST));
+                            Log.d("MainActivity","master send the ntp request to slave");
                             //自己这边开始NTP同步
                             textView.append("master is sync ntp\n");
                             ntpSyncSucceed = true;
@@ -294,38 +334,57 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     masterConnectThread = new ConnectThread(listenerThread.getSocket(),mainHandler);
                     masterConnectThread.start();
                     break;
+                case NTP_SYNC_REQUEST_INT:
+                    textView.append("master says: sync the NTP\n");
+                    slaveConnectThread.threadHandler.sendMessage(getMessage(NTP_SYNC_SUCCESS));
+                    break;
                 case NTP_SYNC_SUCCESS_INT:
                     if(ntpSyncSucceed){
                         //自己这边也开始密钥生成步骤
                         textView.append("slave says: sync succeeded\n");
+                        Log.d("MainActivity", "handleMessage: master start to generate the key");
                         masterConnectThread.threadHandler.sendMessage(getMessage(KEY_GEN_START));
-                        Intent intent = new Intent(MainActivity.this,SampleActivity.class);
-                        startActivity(intent);
-
+                        KeyGenThread keyGenThread = new KeyGenThread(mainHandler);
+                        keyGenThread.start();
+                        progressTextView.setText("Master is on key gen,please wait...");
                     }
                     break;
                 case NTP_SYNC_FAILED_INT:
-                    //Toast.makeText(MainActivity.this,"slave NTP同步失败",Toast.LENGTH_SHORT).show();
                     ntpSyncSucceed = false;
+                    ntpSyncRequested = false;
                     textView.append("slave says: he failed sync NTP\n");
+                    break;
+                case KEY_GEN_START_INT:
+                    textView.append("master says:ken gen start\n");
+                    KeyGenThread keyGenThread = new KeyGenThread(mainHandler);
+                    keyGenThread.start();
+                    progressTextView.setText("Slave is on key gen,please wait...");
+                    break;
+                case KEY_GEN_SUCCESS_INT:
+                    rawKey = message.obj.toString();
+                    keyTextView.setText(rawKey);
+                    progressTextView.setText("The key has been genearated");
+                    if(!isMaster){
+                        Log.d("MainActivity","slave key gen succeed");
+                        slaveConnectThread.threadHandler.sendMessage(getMessage(KEY_GEN_FINISHED));
+                    }
                     break;
                 case KEY_GEN_FINISHED_INT:
                     masterConnectThread.threadHandler.sendMessage(getMessage(INFO_RECON_START));
                     textView.append("slave says: he finished the key gen procedure\n");
                     //开始信息协调程序
-                    break;
-                case KEY_GEN_START_INT:
-                    textView.append("master says:ken gen start\n");
-                    slaveConnectThread.threadHandler.sendMessage(getMessage(KEY_GEN_FINISHED));
+                    masterConnectThread.threadHandler.sendEmptyMessage(END_INT);
+                    progressTextView.setText("All finished");
+                    ntpSyncRequested=false;
+                    ntpSyncSucceed = false;
                     break;
                 case INFO_RECON_START_INT:
                     textView.append("master says:information reconciliation start\n");
+                    //开始信息协调程序
+                    progressTextView.setText("All finished");
+                    ntpSyncRequested=false;
+                    ntpSyncSucceed = false;
                     break;
-                case NTP_SYNC_REQUEST_INT:
-                    textView.append("master says: sync the NTP\n");
-                    slaveConnectThread.threadHandler.sendMessage(getMessage(NTP_SYNC_SUCCESS));
-                    break;
-
             }
         }
     }

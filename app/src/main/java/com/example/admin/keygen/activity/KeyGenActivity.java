@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 
 
-public class KeyGenActivity extends AppCompatActivity implements View.OnClickListener {
+public class KeyGenActivity extends AppCompatActivity {
 
     private float[][] acc_data = null;
     private float[] acc_x = null;
@@ -30,7 +30,6 @@ public class KeyGenActivity extends AppCompatActivity implements View.OnClickLis
     private float[] acc_z = null;
 
     TextView keyTextView;
-    Button startKeyGen;
 
     String accFilePath;
     String key_str;
@@ -42,47 +41,33 @@ public class KeyGenActivity extends AppCompatActivity implements View.OnClickLis
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_key_gen);
-        initView();
+        init();
+        startKeyGen();
     }
-    protected void initView(){
-
-        keyTextView = (TextView)findViewById(R.id.key_text_view);
-        startKeyGen = (Button)findViewById(R.id.startKeyGen);
-        startKeyGen.setOnClickListener(this);
+    protected void init(){
 
         myHandler = new MyHandler(KeyGenActivity.this);
-
         Intent intent = getIntent();
         accFilePath = intent.getStringExtra("accFilePath");
 
     }
 
-    @Override
-    public void onClick(View view){
-
-        int id = view.getId();
-        if(id == R.id.startKeyGen){
-            try {
-
-                Log.i(TAG, "KeyGenBtn is pressed!");
-                float[] signal = load(accFilePath);
-                float[] normalized_z = mapminmax(signal, -10f, 10f);
-                float[] abs_z = abs(normalized_z);
-                int[] bin_z = bin_thre(abs_z, 2);
-                float[] win_z = window(bin_z);
-                int[] key = bin_thre(win_z, (float) 0.6);
-                key_str = new String(toString(key));
-                Log.i(TAG, "key_str: " + key_str);
-                myHandler.sendEmptyMessage(1);
-
-            }catch (Exception e){
-                e.printStackTrace();
-                Log.e(TAG,e.getMessage());
-            }
-
+    private void startKeyGen(){
+        try{
+            float[] signal = load(accFilePath);
+            float[] normalized_z = mapminmax(signal, -10f, 10f);
+            float[] abs_z = abs(normalized_z);
+            int[] bin_z = bin_thre(abs_z, 2);
+            float[] win_z = window(bin_z);
+            int[] key = bin_thre(win_z, (float) 0.6);
+            key_str = new String(toString(key));
+            Log.i(TAG, "key_str: " + key_str);
+            myHandler.sendEmptyMessage(1);
+        }catch (Exception e){
+            e.printStackTrace();
         }
-    }
 
+    }
 
 
     /*
@@ -212,7 +197,7 @@ public class KeyGenActivity extends AppCompatActivity implements View.OnClickLis
         return sb;
     }
 
-    static class MyHandler extends Handler {
+    class MyHandler extends Handler {
         WeakReference<KeyGenActivity> mActivity;
         private MyHandler(KeyGenActivity activity){
             mActivity = new WeakReference<>(activity);
@@ -226,7 +211,9 @@ public class KeyGenActivity extends AppCompatActivity implements View.OnClickLis
                 case 1:
                     // 添加更新ui的代码
                     Log.i(TAG,"Handling the massage...");
-                    keyGenActivity.setKey(keyGenActivity.key_str);
+                    Intent intent = new Intent(KeyGenActivity.this,MainActivity.class);
+                    intent.putExtra("rawKey",key_str);
+                    startActivity(intent);
                     break;
                 case 0:
                     break;

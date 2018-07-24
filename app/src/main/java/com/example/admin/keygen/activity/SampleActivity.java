@@ -12,8 +12,6 @@ import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,14 +24,12 @@ import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class SampleActivity extends AppCompatActivity implements View.OnClickListener {
+public class SampleActivity extends AppCompatActivity{
 
     TextView min;
     TextView sec;
 
     TextView accTextView;
-    Button accStartBtn;
-    Button accStopBtn;
 
     StringBuilder sampleData = new StringBuilder("");
     String accPath;
@@ -43,7 +39,7 @@ public class SampleActivity extends AppCompatActivity implements View.OnClickLis
 
     MyHandler myHandler;
     long timeUsedInSec;
-    boolean isStop = true;
+
 
     int count=0;
 
@@ -66,6 +62,7 @@ public class SampleActivity extends AppCompatActivity implements View.OnClickLis
          * 控件初始化
          */
         initView();
+        startSample();
     }
 
     public void initView() {
@@ -73,15 +70,12 @@ public class SampleActivity extends AppCompatActivity implements View.OnClickLis
         min = (TextView) findViewById(R.id.min);
         sec = (TextView) findViewById(R.id.sec);
         accTextView = (TextView) findViewById(R.id.accTextView);
-        accStartBtn = (Button) findViewById(R.id.accStartBtn);
-        accStopBtn = (Button) findViewById(R.id.accStopBtn);
 
         sm = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         sensorType = Sensor.TYPE_LINEAR_ACCELERATION;
 
         myHandler = new MyHandler(this);
-        accStartBtn.setOnClickListener(this);
-        accStopBtn.setOnClickListener(this);
+
     }
 
     final SensorEventListener myAccelerometerListener = new SensorEventListener(){
@@ -103,12 +97,17 @@ public class SampleActivity extends AppCompatActivity implements View.OnClickLis
                 count++;
                 if (count == 12800)
                 {
-                    //sm.unregisterListener(myAccelerometerListener);
                     Toast.makeText(SampleActivity.this,"已采样12800次",Toast.LENGTH_LONG).show();
                     Log.i(TAG,"采样12800次");
-                    //myHandler.sendEmptyMessage(0);
-                    //isStop = true;
-                    //writeData2File(sampleData,accPath);
+                    sm.unregisterListener(myAccelerometerListener);
+                    accTextView.setText("已保存文件！");
+                    myHandler.sendEmptyMessage(0);
+
+                    writeData2File(sampleData, accPath);
+                    wden(4,9,accPath,accDenoisedPath);
+                    Intent key_gen = new Intent(SampleActivity.this, KeyGenActivity.class);
+                    key_gen.putExtra("accFilePath", accDenoisedPath);
+                    startActivity(key_gen);
                 }
 
             }
@@ -120,48 +119,22 @@ public class SampleActivity extends AppCompatActivity implements View.OnClickLis
     };
 
 
-    @Override
-    public void onClick(View view){
-        int id = view.getId();
-
-        if(id == R.id.accStartBtn){
-            if(isStop) {
-                Log.i(TAG, "AccStartBtn is pressed!");
-                //Toast.makeText(SampleActivity.this,"AccStartBtn is pressed!",Toast.LENGTH_SHORT).show();
-                //20Hz=50000,50Hz=20000 100Hz=10000
-                sm.registerListener(myAccelerometerListener, sm.getDefaultSensor(sensorType), 10000);
-                int s_len = sampleData.length();
-                sampleData.delete(0, s_len);
-                count = 0;
-                accPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Download" + File.separator + getTime() + ".txt";
-                accDenoisedPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Download" + File.separator + getTime()+"_denoided.txt";
-                Log.i(TAG, "String acc path:" + accPath);
-                file = new File(accPath);
-                min.setText("00");
-                sec.setText("00");
-                timeUsedInSec = 0;
-                myHandler.sendEmptyMessage(1);
-                isStop = false;
-            }
-            else {Toast.makeText(SampleActivity.this,"Sampling is running",Toast.LENGTH_SHORT).show();}
-        }
-        else if(id == R.id.accStopBtn) {
-            Log.i(TAG,"AccSopBtn is pressed!");
-            if(count>=12800) {
-                //Toast.makeText(SampleActivity.this,"AccSopBtn",Toast.LENGTH_SHORT).show();
-                sm.unregisterListener(myAccelerometerListener);
-                accTextView.setText("已保存文件！");
-                //Toast.makeText(SampleActivity.this,"已保存文件！.",Toast.LENGTH_SHORT).show();
-                myHandler.sendEmptyMessage(0);
-                isStop = true;
-                writeData2File(sampleData, accPath);
-                wden(4,9,accPath,accDenoisedPath);
-                Intent key_gen = new Intent(SampleActivity.this, KeyGenActivity.class);
-                key_gen.putExtra("accFilePath", accDenoisedPath);
-                startActivity(key_gen);
-            }
-            else{Toast.makeText(SampleActivity.this,"Sample count is less than 12800",Toast.LENGTH_SHORT).show();}
-        }
+    private void startSample(){
+        Log.i(TAG, "AccStartBtn is pressed!");
+        //Toast.makeText(SampleActivity.this,"AccStartBtn is pressed!",Toast.LENGTH_SHORT).show();
+        //20Hz=50000,50Hz=20000 100Hz=10000
+        sm.registerListener(myAccelerometerListener, sm.getDefaultSensor(sensorType), 10000);
+        int s_len = sampleData.length();
+        sampleData.delete(0, s_len);
+        count = 0;
+        accPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Download" + File.separator + getTime() + ".txt";
+        accDenoisedPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Download" + File.separator + getTime()+"_denoided.txt";
+        Log.i(TAG, "String acc path:" + accPath);
+        file = new File(accPath);
+        min.setText("00");
+        sec.setText("00");
+        timeUsedInSec = 0;
+        myHandler.sendEmptyMessage(1);
 
     }
 
@@ -194,7 +167,7 @@ public class SampleActivity extends AppCompatActivity implements View.OnClickLis
             switch (msg.what) {
                 case 1:
                     // 添加更新ui的代码
-                    if (!sampleActivity.isStop) {
+                    if (true) {
                         sampleActivity.updateView();
                         sampleActivity.myHandler.sendEmptyMessageDelayed(1, 1000);
                     }
