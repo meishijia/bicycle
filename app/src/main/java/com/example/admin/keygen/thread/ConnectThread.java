@@ -18,6 +18,7 @@ import static com.example.admin.keygen.activity.MainActivity.END;
 import static com.example.admin.keygen.activity.MainActivity.END_INT;
 import static com.example.admin.keygen.activity.MainActivity.INFO_RECON_START;
 import static com.example.admin.keygen.activity.MainActivity.INFO_RECON_START_INT;
+import static com.example.admin.keygen.activity.MainActivity.KEY_CONFIRM_INT;
 import static com.example.admin.keygen.activity.MainActivity.KEY_GEN_FINISHED;
 import static com.example.admin.keygen.activity.MainActivity.KEY_GEN_FINISHED_INT;
 import static com.example.admin.keygen.activity.MainActivity.KEY_GEN_START;
@@ -29,7 +30,8 @@ import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_REQUEST;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_REQUEST_INT;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_SUCCESS;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_SUCCESS_INT;
-
+import static com.example.admin.keygen.activity.MainActivity.SYNDROME_INT;
+import static com.example.admin.keygen.activity.MainActivity.KEY_CONFIRM_INT;
 
 
 /**
@@ -112,8 +114,21 @@ public class ConnectThread extends Thread{
                             else if(content.equals(NTP_SYNC_FAILED)){
                                 mainHandler.sendEmptyMessage(NTP_SYNC_FAILED_INT);
                             }
+                            else if(content.contains("Syndromes:")){
+                                Message message = Message.obtain();
+                                message.what = SYNDROME_INT;
+                                message.obj = content.substring(10);
+                                mainHandler.sendMessage(message);
+                            }
+                            else if(content.contains("KeyConfirm:")){
+                                Message message = Message.obtain();
+                                message.what = KEY_CONFIRM_INT;
+                                message.obj = content.substring(11);
+                                mainHandler.sendMessage(message);
+                            }
+                            // else the slave received the syndroms
                             else {
-                                Log.d("ConnectThread","Cannot recognize the content of message");
+
                             }
                         }
                     }catch (IOException e){

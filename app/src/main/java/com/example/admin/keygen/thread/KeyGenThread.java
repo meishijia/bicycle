@@ -50,7 +50,6 @@ public class KeyGenThread extends Thread {
         sm = (SensorManager) MyApplication.getContext().getSystemService(Context.SENSOR_SERVICE);
         sensorType = Sensor.TYPE_LINEAR_ACCELERATION;
         startSampleThenKeyGen();
-
     }
 
     private final SensorEventListener myAccelerometerListener = new SensorEventListener(){
@@ -67,12 +66,12 @@ public class KeyGenThread extends Thread {
 
                 float f[]={X_lateral,Y_longitudinal,Z_vertical};
 
-                //写入时统一用float，独读出时统一用double
+                //写入时统一用float
                 sampleData.append(f[2]+"\r\n");
                 count++;
-                if (count == 100)
+                if (count == 12800)
                 {
-                    Log.d(TAG,"采样12800次");
+                    Log.d(TAG,"采样100次");
                     sm.unregisterListener(myAccelerometerListener);
                     writeData2File(sampleData, accPath);
                     wden(4,9,accPath,accDenoisedPath);
@@ -112,8 +111,10 @@ public class KeyGenThread extends Thread {
         String time = simpleDateFormat.format(date);
         return time;
     }
+
     protected void writeData2File(StringBuilder data,String filename){
         try {
+            Log.d(TAG, "writeData2File: data"+data.toString());
             File file = new File(filename);
             //Toast.makeText(SampleActivity.this,"文件写入中...",Toast.LENGTH_SHORT).show();
             BufferedWriter bw = new BufferedWriter(new FileWriter(file));
@@ -159,6 +160,7 @@ public class KeyGenThread extends Thread {
             bufread = new BufferedReader(new FileReader(file));
             while((read=bufread.readLine()) != null){
                 data[i] = Float.parseFloat(read);
+                Log.d(TAG, "load: data["+i+"] = "+data[i]);
                 i++;
             }
             bufread.close();

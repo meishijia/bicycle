@@ -23,6 +23,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.admin.keygen.R;
+import com.example.admin.keygen.RSCode.Polynomial16;
+import com.example.admin.keygen.RSCode.RSDecoder16;
+import com.example.admin.keygen.RSCode.Utils;
 import com.example.admin.keygen.thread.ConnectThread;
 import com.example.admin.keygen.thread.KeyGenThread;
 import com.example.admin.keygen.thread.ListenerThread;
@@ -37,6 +40,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+
+    public final static String TAG = "MainActivity";
 
     public final static int MSG_REV = 11;
     public final static int MSG_SEND = 12;
@@ -56,7 +61,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public final static int KEY_GEN_SUCCESS_INT =35;
     public final static int KEY_GEN_FINISHED_INT = 36;
     public final static int INFO_RECON_START_INT = 37;
-    public final static int END_INT = 38;
+    public final static int SYNDROME_INT = 38;
+    public final static int KEY_CONFIRM_INT = 39;
+    public final static int END_INT = 40;
 
     public final static String NTP_SYNC_REQUEST = "NTP_SYNC_REQUEST";
     public final static String NTP_SYNC_SUCCESS = "NTP_SYNC_SUCCESS";
@@ -77,6 +84,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     TextView character;
     TextView keyTextView;
     TextView progressTextView;
+    TextView newKeyTextView;
 
     boolean isMaster;
     boolean charChoosed = false;
@@ -109,6 +117,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         character = (TextView)findViewById(R.id.character);
         keyTextView = (TextView)findViewById(R.id.key_show);
         progressTextView = (TextView)findViewById(R.id.progress_show);
+        newKeyTextView = (TextView)findViewById(R.id.new_key);
 
         master.setOnClickListener(this);
         slave.setOnClickListener(this);
@@ -362,6 +371,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     break;
                 case KEY_GEN_SUCCESS_INT:
                     rawKey = message.obj.toString();
+                    Log.d(TAG, "rawkey:" + rawKey);
                     keyTextView.setText(rawKey);
                     progressTextView.setText("The key has been genearated");
                     if(!isMaster){
@@ -370,20 +380,56 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                     break;
                 case KEY_GEN_FINISHED_INT:
-                    masterConnectThread.threadHandler.sendMessage(getMessage(INFO_RECON_START));
+                    //masterConnectThread.threadHandler.sendMessage(getMessage(INFO_RECON_START));
                     textView.append("slave says: he finished the key gen procedure\n");
                     //开始信息协调程序
-                    masterConnectThread.threadHandler.sendEmptyMessage(END_INT);
-                    progressTextView.setText("All finished");
-                    ntpSyncRequested=false;
-                    ntpSyncSucceed = false;
+                    Log.d(TAG, "alice is sendding the syndrome to bob");
+                    Log.d(TAG,"rawKey: "+rawKey);
+                    if (rawKey == null){
+                        Log.d(TAG, "raw key is null");
+                        try{
+                            Thread.sleep(1000);
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+                    }
+                    Polynomial16[] polynomials = Utils.rawKey2Polynomials(rawKey);
+                    Polynomial16[] syndromePolynomials= Utils.getSyndromePolynomials(polynomials);
+                    String syndromes= Utils.polynomials2String(syndromePolynomials);
+                    if(syndromes != null){
+                        Message syndromMessage = getMessage("Syndromes:"+syndromes);
+                        masterConnectThread.threadHandler.sendMessage(syndromMessage);
+                    }
+                    progressTextView.setText("Infomation reconciliation is starting");
                     break;
                 case INFO_RECON_START_INT:
                     textView.append("master says:information reconciliation start\n");
                     //开始信息协调程序
                     progressTextView.setText("All finished");
-                    ntpSyncRequested=false;
-                    ntpSyncSucceed = false;
+                    //ntpSyncRequested=false;
+                    //ntpSyncSucceed = false;
+                    break;
+                case SYNDROME_INT:
+                    textView.append("master send the syndromes\n");
+                    String aliceSyndromStr = message.obj.toString();
+                    Log.d("MainActivity", "aliceSyndrome:"+aliceSyndromStr);
+                    String newkey = infoReconciliation(aliceSyndromStr);
+                    Log.d("MainActivity", "newkey:"+newkey);
+                    newKeyTextView.setText(newkey);
+                    Message keyConfirm = getMessage("KeyConfirm:"+newkey);
+                    slaveConnectThread.threadHandler.sendMessage(keyConfirm);
+                    break;
+                case KEY_CONFIRM_INT:
+                    textView.append("slave send the new key to confirm\n");
+                    String bobKey = message.obj.toString();
+                    Log.d("MainActivity", "bobKey:"+bobKey);
+                    if(rawKey.equals(bobKey)){
+                        progressTextView.setText("Key is same");
+                    }
+                    else{
+                        progressTextView.setText("Key is different");
+                    }
+                    masterConnectThread.threadHandler.sendEmptyMessage(END_INT);
                     break;
             }
         }
@@ -395,6 +441,46 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         msg.what = MSG_SEND;
         msg.obj = msgString;
         return msg;
+    }
+
+
+    public String infoReconciliation(String syndrome){
+        StringBuffer newKey = new StringBuffer();
+        byte[] syndromeBytes = Utils.string2Bytes(syndrome);
+        int count = syndromeBytes.length;
+        int len = count/3;
+        Log.d(TAG, "infoReconciliation: syndrome block len: "+len);
+        byte[] aliceSyndromeBytes1 = new byte[len];
+        byte[] aliceSyndromeBytes2 = new byte[len];
+        byte[] aliceSyndromeBytes3 = new byte[len];
+        for(int i=0;i<len;i++){
+            aliceSyndromeBytes1[i] = syndromeBytes[i];
+        }
+        for(int i=0;i<len;i++){
+            aliceSyndromeBytes2[i] = syndromeBytes[len+i];
+        }
+        for(int i=0;i<len;i++){
+            aliceSyndromeBytes3[i] = syndromeBytes[len+len+i];
+        }
+        Polynomial16[] aliceSyndromes = new Polynomial16[3];
+        aliceSyndromes[0] = new Polynomial16(aliceSyndromeBytes1);
+        aliceSyndromes[1] = new Polynomial16(aliceSyndromeBytes2);
+        aliceSyndromes[2] = new Polynomial16(aliceSyndromeBytes3);
+        Polynomial16[] bobPolynomials = Utils.rawKey2Polynomials(rawKey);
+        Polynomial16[] bobSyndromes = Utils.getSyndromePolynomials(bobPolynomials);
+        RSDecoder16 decoder = new RSDecoder16();
+        for(int i=0;i<3;i++){
+            Polynomial16 errorPoly = decoder.getErrorPoly(aliceSyndromes[i],bobSyndromes[i]);
+            Polynomial16 codeword  = bobPolynomials[i].sub(errorPoly);
+            String codeWordString = Utils.singlePoly2String(codeword);
+            newKey.append(codeWordString);
+        }
+        if(newKey == null){
+            Log.d(TAG, "infoReconciliation: newKey is null");
+            newKey.append("newKey is null");
+        }
+        return newKey.toString().substring(0,128);
+
     }
 
     @Override
