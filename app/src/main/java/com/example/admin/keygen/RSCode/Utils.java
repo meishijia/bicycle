@@ -24,7 +24,7 @@ public class Utils {
     }
 
     /**
-     *
+     * 如[1,2,3] -> 000100100011
      * @param bytes 数组，值是域GF(16)中的元素
      * @return 将数组中的每个元素转化为4位二进制表示的形式拼接成字符串
      */
@@ -32,7 +32,6 @@ public class Utils {
         StringBuffer result=new StringBuffer("");
         for(int i=0;i<bytes.length;i++) {
             String tmp = Integer.toBinaryString(bytes[i]);
-            //System.out.println(tmp);
             int tmpLength = tmp.length();
             if(tmpLength < 4) {
                 StringBuffer sb = new StringBuffer("");
@@ -48,8 +47,6 @@ public class Utils {
         //System.out.println(result.toString());
         return result.toString();
     }
-
-
 
     /**
      * 将Polynomial数组中的所有Polynomial表示成字符串
@@ -68,6 +65,11 @@ public class Utils {
         return sb.toString();
     }
 
+    /**
+     * 将单个多项式转化为字符串形式
+     * @param poly
+     * @return
+     */
     public static String singlePoly2String(Polynomial16 poly){
         String result = bytes2String(poly.toBytes());
         Log.d(TAG, "singlePoly2String: result" + result);
@@ -75,7 +77,11 @@ public class Utils {
     }
 
 
-
+    /**
+     * 将一个128位的密钥转换成3个Polynomial
+     * @param rawKey
+     * @return
+     */
     public static Polynomial16[] rawKey2Polynomials(String rawKey){
         Log.d(TAG, "rawKey: "+rawKey);
         if(rawKey == null){
@@ -85,8 +91,8 @@ public class Utils {
         byte[] rawByteKey = new byte[45];
 
         for(int i=0;i<32;i++){
-            String masetrTmpStr = rawKey.substring(i*4,(i+1)*4);
-            rawByteKey[i] = (byte)Integer.parseInt(masetrTmpStr,2);
+            String masterTmpStr = rawKey.substring(i*4,(i+1)*4);
+            rawByteKey[i] = (byte)Integer.parseInt(masterTmpStr,2);
         }
         for(int i=32;i<45;i++){
             rawByteKey[i] = 0;
@@ -114,6 +120,11 @@ public class Utils {
         return polynomials;
     }
 
+    /**
+     * 将密钥的多项式组，分别计算syndrome多项式
+     * @param polynomials
+     * @return
+     */
     public static Polynomial16[] getSyndromePolynomials(Polynomial16[] polynomials){
         RSDecoder16 decoder = new RSDecoder16();
         Polynomial16 syndromes1 = decoder.calSyndromes(polynomials[0]);
@@ -125,6 +136,8 @@ public class Utils {
         Polynomial16[] syndromePolynomials = {syndromes1,syndromes2,syndromes3};
         return syndromePolynomials;
     }
+
+
 
 
 }

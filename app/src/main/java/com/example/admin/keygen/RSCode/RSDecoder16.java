@@ -119,27 +119,46 @@ public class RSDecoder16 extends RSCode16 {
 
     public Polynomial16 getErrorPoly(Polynomial16 aliceSyndrome,Polynomial16 bobSyndrome){
         Polynomial16 diffSyndrome = aliceSyndrome.sub(bobSyndrome);
-        Log.d(TAG, "getErrorPoly: diffSyndrome:" + diffSyndrome.coefficients);
 
-        GF16[] zero = {new GF16(0)};
-        if(diffSyndrome.equals(new Polynomial16(zero))){
-            return new Polynomial16(zero);
+        GF16[] diffSyndromeCoeffetients = diffSyndrome.coefficients;
+        System.out.println("----------diffsyndrome.coeffecients--------");
+        for (GF16 c : diffSyndromeCoeffetients)
+        {
+            System.out.print(c+" ");
         }
+        System.out.println("\n");
 
-        //当diffSyndrome为0的时候，说明两个密钥相同，不需要再纠错
-        Polynomial16[] bmPoly = calBerlekampMassey(diffSyndrome);
-        Polynomial16 sigma = bmPoly[0];
-        Polynomial16 omiga = bmPoly[1];
-        List[] chienLists = chienSearch(sigma);
-        List<GF16> YList = forney(omiga,(List<GF16>) chienLists[0]);
-        List<Integer> jList = chienLists[1];
+
         GF16[] errors = new GF16[this.n];
-        for (int i = 0; i < this.n; i++) {
-            if (jList.contains(i)) {
-                errors[i] = YList.get(jList.lastIndexOf(i));
-            } else {
-                errors[i] = ZERO;
+        getErrorPolyBlock:
+        {
+            byte[] zero = {0};
+            Polynomial16 zeroPoly = new Polynomial16(zero);
+            //当diffSyndrome为0的时候，说明两个密钥相同，不需要再纠错
+            if(diffSyndrome.equals(zeroPoly))
+            {
+                for(int i=0;i<this.n;i++)
+                {
+                    errors[i] = ZERO;
+                }
+                break getErrorPolyBlock;
             }
+
+            Polynomial16[] bmPoly = calBerlekampMassey(diffSyndrome);
+            Polynomial16 sigma = bmPoly[0];
+            Polynomial16 omiga = bmPoly[1];
+            List[] chienLists = chienSearch(sigma);
+            List<GF16> YList = forney(omiga,(List<GF16>) chienLists[0]);
+            List<Integer> jList = chienLists[1];
+
+            for (int i = 0; i < this.n; i++) {
+                if (jList.contains(i)) {
+                    errors[i] = YList.get(jList.lastIndexOf(i));
+                } else {
+                    errors[i] = ZERO;
+                }
+            }
+
         }
         Polynomial16 errorPoly = new Polynomial16(errors);
         return errorPoly;

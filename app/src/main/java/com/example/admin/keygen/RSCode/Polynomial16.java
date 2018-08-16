@@ -2,6 +2,10 @@ package com.example.admin.keygen.RSCode;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * 该类为表示系数为GF16的多项式
+ * 拥有加减乘除等多项式运算方法
+ */
 public class Polynomial16 {
     //用于比较或中间运算 不可用于赋值 赋值应该新分配空间
     private final static GF16 ZERO = new GF16(0);

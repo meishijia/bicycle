@@ -24,7 +24,8 @@ import java.util.Date;
 
 import static com.example.admin.keygen.activity.MainActivity.KEY_GEN_SUCCESS_INT;
 
-public class KeyGenThread extends Thread {
+public class KeyGenThread extends Thread
+{
 
     private StringBuilder sampleData = new StringBuilder("");
     private String accPath;
@@ -36,7 +37,8 @@ public class KeyGenThread extends Thread {
     private int sensorType;
     private  Handler mHandler;
 
-    static {
+    static
+    {
         System.loadLibrary("native-lib");
     }
 
@@ -45,18 +47,21 @@ public class KeyGenThread extends Thread {
     }
 
     @Override
-    public void run(){
+    public void run()
+    {
         Log.d(TAG, "key gen thread is running");
         sm = (SensorManager) MyApplication.getContext().getSystemService(Context.SENSOR_SERVICE);
         sensorType = Sensor.TYPE_LINEAR_ACCELERATION;
         startSampleThenKeyGen();
     }
 
-    private final SensorEventListener myAccelerometerListener = new SensorEventListener(){
+    private final SensorEventListener myAccelerometerListener = new SensorEventListener()
+    {
 
         //复写onSensorChanged方法
         public void onSensorChanged(SensorEvent sensorEvent){
-            if(sensorEvent.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION){
+            if(sensorEvent.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION)
+            {
 
                 //Log.i(TAG,"onSensorChanged");
 
@@ -75,10 +80,22 @@ public class KeyGenThread extends Thread {
                     sm.unregisterListener(myAccelerometerListener);
                     writeData2File(sampleData, accPath);
                     wden(4,9,accPath,accDenoisedPath);
-                    String raw_key = startKeyGen();
+                    String rawKey = startKeyGen();
+                    String keyStoragePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Download" + File.separator + "rawkey" + ".txt";
+                    try {
+
+                        File file = new File(keyStoragePath);
+                        BufferedWriter bw = new BufferedWriter(new FileWriter(file));
+                        bw.write(rawKey);
+                        bw.flush();
+                        bw.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
                     Message message = Message.obtain();
                     message.what = KEY_GEN_SUCCESS_INT;
-                    message.obj = raw_key;
+                    message.obj = rawKey;
                     mHandler.sendMessage(message);
 
                 }
@@ -86,12 +103,14 @@ public class KeyGenThread extends Thread {
             }
         }
         //复写onAccuracyChanged方法
-        public void onAccuracyChanged(Sensor sensor , int accuracy){
+        public void onAccuracyChanged(Sensor sensor , int accuracy)
+        {
             //Log.i(TAG, "onAccuracyChanged");
         }
     };
 
-    private void startSampleThenKeyGen(){
+    private void startSampleThenKeyGen()
+    {
         Log.d(TAG, "sample procedure started");
         //Toast.makeText(SampleActivity.this,"AccStartBtn is pressed!",Toast.LENGTH_SHORT).show();
         //20Hz=50000,50Hz=20000 100Hz=10000
@@ -105,14 +124,16 @@ public class KeyGenThread extends Thread {
 
     }
 
-    public String getTime(){
+    public String getTime()
+    {
         Date date = new Date(System.currentTimeMillis());
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy_MM_dd_HH:mm:ss");
         String time = simpleDateFormat.format(date);
         return time;
     }
 
-    protected void writeData2File(StringBuilder data,String filename){
+    protected void writeData2File(StringBuilder data,String filename)
+    {
         try {
             Log.d(TAG, "writeData2File: data"+data.toString());
             File file = new File(filename);
@@ -128,7 +149,8 @@ public class KeyGenThread extends Thread {
 
     public native void wden(int scale,int dbn,String srcfile,String dstfile);
 
-    private String startKeyGen(){
+    private String startKeyGen()
+    {
 
         String key_str="";
 
@@ -150,7 +172,8 @@ public class KeyGenThread extends Thread {
     }
 
 
-    protected float[] load(String filename){
+    protected float[] load(String filename)
+    {
         int i=0;
         float[] data = new float[12800];
         try{
@@ -160,7 +183,7 @@ public class KeyGenThread extends Thread {
             bufread = new BufferedReader(new FileReader(file));
             while((read=bufread.readLine()) != null){
                 data[i] = Float.parseFloat(read);
-                Log.d(TAG, "load: data["+i+"] = "+data[i]);
+                //Log.d(TAG, "load: data["+i+"] = "+data[i]);
                 i++;
             }
             bufread.close();
@@ -169,10 +192,12 @@ public class KeyGenThread extends Thread {
         }catch (IOException e){
             e.printStackTrace();
         }
-        Log.d(TAG,Integer.toString(i));
+        //Log.d(TAG,Integer.toString(i));
         return data;
     }
-    protected float[] mapminmax(float[] x, float ymin,float ymax){
+
+    protected float[] mapminmax(float[] x, float ymin,float ymax)
+    {
         float[] y = new float[x.length];
         float xmin = min(x);
         float xmax = max(x);
@@ -182,7 +207,8 @@ public class KeyGenThread extends Thread {
         return y;
     }
 
-    protected float min(float[] x){
+    protected float min(float[] x)
+    {
         float tmp = x[0];{
             for(int i=1;i<x.length;i++){
                 if(x[i] < tmp){
@@ -192,7 +218,8 @@ public class KeyGenThread extends Thread {
         }
         return tmp;
     }
-    protected float max(float[] x){
+    protected float max(float[] x)
+    {
         float tmp = x[0];{
             for(int i=1;i<x.length;i++){
                 if(x[i] > tmp){
@@ -203,7 +230,8 @@ public class KeyGenThread extends Thread {
         return tmp;
     }
 
-    protected float[] abs(float[] x){
+    protected float[] abs(float[] x)
+    {
         float[] y = new float[x.length];
         for(int i=0;i<x.length;i++){
             y[i] = Math.abs(x[i]);
@@ -211,7 +239,8 @@ public class KeyGenThread extends Thread {
         return y;
     }
 
-    protected int[] bin_thre(float[] x,float thres){
+    protected int[] bin_thre(float[] x,float thres)
+    {
         int[] y= new int[x.length];
         for(int i=0;i<x.length;i++){
             if(x[i] >= thres){
@@ -222,7 +251,8 @@ public class KeyGenThread extends Thread {
         return y;
     }
 
-    protected float[] window(int[] x){
+    protected float[] window(int[] x)
+    {
         float[] y=new float[128];
         for(int i=0;i<128;i++){
             float sum = 0;

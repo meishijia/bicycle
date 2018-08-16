@@ -31,19 +31,21 @@ import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_REQUEST_IN
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_SUCCESS;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_SUCCESS_INT;
 import static com.example.admin.keygen.activity.MainActivity.SYNDROME_INT;
-import static com.example.admin.keygen.activity.MainActivity.KEY_CONFIRM_INT;
 
 
 /**
+ * ConnectThread 将处理来自slave/master的消息，通过判断接受到的消息内容
+ * 通过mainHandler向MainActivity返回不同类型的消息
+ * 注意：slave和master接受到的消息不相同，当都在本类中处理
  * Created by admin on 2018/7/16.
  */
 
 public class ConnectThread extends Thread{
+
+    public final static String TAG = "ConnectThread";
     private Socket socket;
-    //private String serverAddress;
     private Handler mainHandler;
     private BufferedReader bufferedReader = null;
-    //private InputStream inputStream;
     private BufferedOutputStream outputStream;
     public Handler threadHandler;
 
@@ -58,7 +60,7 @@ public class ConnectThread extends Thread{
             return;
         }
         Log.d("ConnectThread","connect thread is running");
-        mainHandler.sendEmptyMessage(MainActivity.DEVICE_CONNECTED);
+
         try {
             //获取数据流
             //inputStream = socket.getInputStream();
@@ -68,8 +70,7 @@ public class ConnectThread extends Thread{
             if(outputStream == null){
                 Log.d("ConnectThread","When establish the socket, outputStream is null.");
             }
-            //byte[] buffer = new byte[1024];
-            //int bytes;
+
             new Thread(){
                 @Override
                 public void run(){
@@ -80,9 +81,10 @@ public class ConnectThread extends Thread{
                             Log.d("ConnectThread","Thread in connect thread ,and received message "+content);
                             if (content.equals(END)) {
                                 Log.d("ConnectThread","connect thread received END message");
-                                socket.close();
-                                bufferedReader.close();
                                 outputStream.close();
+                                bufferedReader.close();
+                                socket.close();
+                                Log.d(TAG, "run: " + socket.isConnected());
                             }
                             // only client will receive this message
                             else if(content.equals(NTP_SYNC_REQUEST)){
@@ -184,7 +186,7 @@ public class ConnectThread extends Thread{
                 Log.d("ConnectThread","Sending message");
                 outputStream.write(msg.getBytes());
                 Message message = Message.obtain();
-                message.what = MainActivity.SEND_MSG_SUCCSEE;
+                message.what = MainActivity.SEND_MSG_SUCCESS;
                 Bundle bundle = new Bundle();
                 bundle.putString("MSG",new String(msg));
                 message.setData(bundle);
