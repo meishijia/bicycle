@@ -27,9 +27,14 @@ import com.example.admin.keygen.RSCode.GF16;
 import com.example.admin.keygen.RSCode.Polynomial16;
 import com.example.admin.keygen.RSCode.RSDecoder16;
 import com.example.admin.keygen.RSCode.Utils;
+import com.example.admin.keygen.application.MyApplication;
 import com.example.admin.keygen.thread.ConnectThread;
 import com.example.admin.keygen.thread.KeyGenThread;
 import com.example.admin.keygen.thread.ListenerThread;
+import com.example.admin.keygen.zxingRSCode.GenericGF;
+import com.example.admin.keygen.zxingRSCode.GenericGFPoly;
+import com.example.admin.keygen.zxingRSCode.ReedSolomonDecoder;
+import com.example.admin.keygen.zxingRSCode.Utils2;
 
 
 import java.io.IOException;
@@ -120,7 +125,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     /**
      * rawKey：生成的初始密钥
      */
-    public String rawKey;
+    //public String rawKey;
 
     WifiManager wifiManager;
     BroadcastReceiver receiver;
@@ -416,6 +421,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void handleMessage(Message message){
             //MainActivity mainActivity = mActicity.get();
             super.handleMessage(message);
+
             switch (message.what){
                 // (master) ListenerThread -> MainActivity
                 case DEVICE_CONNECTING:
@@ -457,9 +463,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     break;
                 // (slave / master) KeyGenThread -> MainActivity
                 case KEY_GEN_SUCCESS_INT:
-                    rawKey = message.obj.toString();
-                    Log.d(TAG, "rawkey:" + rawKey + "\n");
-                    keyTextView.setText(rawKey);
+                    Log.d(TAG, "handleMessage: isMaster: " + isMaster);
+                    if(isMaster)
+                    {
+                        Log.d(TAG, "handleMessage: master received the KEY_GEN_SUCCESS_INT");
+                        Log.d(TAG, "handleMessage: message:" + message);
+                    }
+                    //rawKey = message.obj.toString();
+                    Log.d(TAG, "rawkey:" + MyApplication.getRawKey() + "\n");
+                    keyTextView.setText(MyApplication.getRawKey());
                     progressTextView.setText("The key has been genearated");
                     if(!isMaster){
                         //slave 将向master发送密钥生成完毕消息
@@ -473,21 +485,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     textView.append("slave says: he finished the key gen procedure\n");
                     //开始信息协调程序
                     Log.d(TAG, "master is sendding the syndrome to slave");
-                    Log.d(TAG,"rawKey: "+rawKey);
-                    while (rawKey == null){
+                    Log.d(TAG,"rawKey: "+MyApplication.getRawKey());
+                    while (MyApplication.getRawKey() == null){
                         Log.d(TAG, "raw key is null");
-                        try{
-                            Thread.sleep(1000);
-                        }catch (Exception e){
-                            e.printStackTrace();
-                        }
                     }
-                    Polynomial16[] rawKeyPolynomials = Utils.rawKey2Polynomials(rawKey);//得到rawKey的三个poly
-                    Polynomial16[] syndromePolynomials= Utils.getSyndromePolynomials(rawKeyPolynomials);//分别计算rawKey的3个block的syndrome
-                    String syndromes= Utils.polynomials2String(syndromePolynomials);
-                    if(syndromes != null){
-                        Message syndromMessage = getMessage("Syndromes:"+syndromes);
-                        masterConnectThread.threadHandler.sendMessage(syndromMessage);
+
+                    GenericGFPoly[] masterSyndrome= Utils2.getSyndromePoly(MyApplication.getRawKey());
+                    StringBuilder syndromesStr = new StringBuilder();
+                    for(int i=0;i<3;i++){
+                        textView.append(masterSyndrome[i].toString()+"\n");
+                        int[] coefficients = masterSyndrome[i].getCoefficients();
+                        Log.d(TAG, "the length of alice syndrome's coefficients: " + coefficients.length);
+                        int[] padding = new int[12];
+                        int distance = 12-coefficients.length;
+                        for(int j=0;j<coefficients.length;j++){
+                            padding[distance+j] = coefficients[j];
+                        }
+                        String coefficientsStr = Utils2.int2String(padding);
+                        syndromesStr.append(coefficientsStr);
+                    }
+
+                    if(syndromesStr != null){
+                        Message syndromeMessage = getMessage("Syndromes:"+syndromesStr);
+                        masterConnectThread.threadHandler.sendMessage(syndromeMessage);
                     }
                     progressTextView.setText("Infomation reconciliation is starting");
                     break;
@@ -504,11 +524,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     textView.append("master send the syndromes\n");
                     String masterSyndromStr = message.obj.toString();
                     Log.d("MainActivity", "masterSyndrome:"+masterSyndromStr);
-                    String newKey = infoReconciliation(masterSyndromStr);
+                    String newKey = "";
+                    try {
+                        newKey = infoReconciliation(masterSyndromStr);
+                    }catch (Exception e){
+                        e.printStackTrace();
+                        progressTextView.append(e.getMessage());
+                    }
                     Log.d("MainActivity", "newkey:"+newKey);
-                    newKeyTextView.setText(newKey);
+                    MyApplication.setfinalKey(newKey);
+                    newKeyTextView.setText(MyApplication.getFinalKey());
                     //将信息协调之后的新密钥发送给master进行确认，这一步需要改进，可用MAC
-                    Message keyConfirm = getMessage("KeyConfirm:"+newKey);
+                    Message keyConfirm = getMessage("KeyConfirm:"+MyApplication.getFinalKey());
                     slaveConnectThread.threadHandler.sendMessage(keyConfirm);
                     break;
                 // (master)
@@ -516,7 +543,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     textView.append("slave send the new key to confirm\n");
                     String bobKey = message.obj.toString();
                     Log.d("MainActivity", "bobKey:"+bobKey);
-                    if(rawKey.equals(bobKey)){
+                    if(MyApplication.getRawKey().equals(bobKey)){
                         progressTextView.setText("Key is same");
                     }
                     else{
@@ -547,72 +574,75 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * @param syndrome
      * @return
      */
-    public String infoReconciliation(String syndrome){
+    public String infoReconciliation(String syndrome) throws Exception
+    {
         StringBuffer newKey = new StringBuffer();
-        byte[] syndromeBytes = Utils.string2Bytes(syndrome);
-        int count = syndromeBytes.length;
+        int[] syndromeInts = Utils2.string2Ints(syndrome);
+        int count = syndromeInts.length;
         int len = count/3;
         Log.d(TAG, "infoReconciliation: syndrome block len: "+len);
-        byte[] aliceSyndromeBytes1 = new byte[len];
-        byte[] aliceSyndromeBytes2 = new byte[len];
-        byte[] aliceSyndromeBytes3 = new byte[len];
+        int[] aliceSyndromeInt1 = new int[len];
+        int[] aliceSyndromeInt2 = new int[len];
+        int[] aliceSyndromeInt3 = new int[len];
         for(int i=0;i<len;i++){
-            aliceSyndromeBytes1[i] = syndromeBytes[i];
+            aliceSyndromeInt1[i] = syndromeInts[i];
         }
         for(int i=0;i<len;i++){
-            aliceSyndromeBytes2[i] = syndromeBytes[len+i];
+            aliceSyndromeInt2[i] = syndromeInts[len+i];
         }
         for(int i=0;i<len;i++){
-            aliceSyndromeBytes3[i] = syndromeBytes[len+len+i];
+            aliceSyndromeInt3[i] = syndromeInts[len+len+i];
         }
-        Polynomial16[] aliceSyndromes = new Polynomial16[3];
-        aliceSyndromes[0] = new Polynomial16(aliceSyndromeBytes1);
-        aliceSyndromes[1] = new Polynomial16(aliceSyndromeBytes2);
-        aliceSyndromes[2] = new Polynomial16(aliceSyndromeBytes3);
-        System.out.println("Bob rawKey: " + rawKey);
-        Polynomial16[] bobPolynomials = Utils.rawKey2Polynomials(rawKey);
-        Polynomial16[] bobSyndromes = Utils.getSyndromePolynomials(bobPolynomials);
-        for(Polynomial16 poly : aliceSyndromes)
+        GenericGFPoly[] aliceSyndromes = new GenericGFPoly[3];
+        aliceSyndromes[0] = new GenericGFPoly(GenericGF.AZTEC_PARAM,aliceSyndromeInt1);
+        aliceSyndromes[1] = new GenericGFPoly(GenericGF.AZTEC_PARAM,aliceSyndromeInt2);
+        aliceSyndromes[2] = new GenericGFPoly(GenericGF.AZTEC_PARAM,aliceSyndromeInt3);
+        textView.append(aliceSyndromes[0].toString()+"\n");
+        textView.append(aliceSyndromes[1].toString()+"\n");
+        textView.append(aliceSyndromes[2].toString()+"\n");
+        System.out.println("Bob rawKey: " + MyApplication.getRawKey());
+        //GenericGFPoly[] bobSyndromes = Utils2.getSyndromePoly(rawKey);
+
+        ReedSolomonDecoder decoder = new ReedSolomonDecoder(GenericGF.AZTEC_PARAM);
+        //将bob/slave的rawKey分成3组int数组
+        int[] slaveKey = new int[45];
+        for(int i=0;i<32;i++)
         {
-            GF16[] aliceSyndromeCoefficeint = poly.coefficients;
-            System.out.println("----------alcieSyndrome.coeffecients--------");
-            for(int i=0;i<aliceSyndromeCoefficeint.length;i++)
-            {
-                System.out.print(aliceSyndromeCoefficeint[i]+" ");
-            }
-            System.out.println("\n");
+            String tmpStr = MyApplication.getRawKey().substring(i*4,(i+1)*4);
+            slaveKey[i] = Integer.parseInt(tmpStr,2);
         }
-        for(Polynomial16 poly :bobSyndromes)
+        for(int i=32;i<45;i++)
         {
-            GF16[] bobSyndromeCoefficient = poly.coefficients;
-            System.out.println("----------bobSyndrome.coeffecients--------");
-            for(int i=0;i<bobSyndromeCoefficient.length;i++)
-            {
-                System.out.print(bobSyndromeCoefficient[i]+" ");
-            }
-            System.out.println("\n");
+            slaveKey[i] = 0;
         }
-
-        RSDecoder16 decoder = new RSDecoder16();
-        for(int i=0;i<3;i++){
-            Polynomial16 errorPoly = decoder.getErrorPoly(aliceSyndromes[i],bobSyndromes[i]);
-            Polynomial16 codeword  = bobPolynomials[i].sub(errorPoly);
-
-            GF16[] codewordCoefficient = codeword.coefficients;
-            byte[] paddingCodeword = new byte[15];
-
-            for(int j=0;j<codewordCoefficient.length;j++){
-                paddingCodeword[j] = (byte) codewordCoefficient[j].getValue();
-            }
-            byte[] reverse = new byte[15];
-            for(int j=0;j<15;j++){
-                reverse[j] = paddingCodeword[paddingCodeword.length-1-j];
-            }
-            String codeWordString = Utils.bytes2String(reverse);
-            Log.d(TAG, "infoReconciliation: codeWordString" + codeWordString);
-            newKey.append(codeWordString);
+        int[] rawKey1 = new int[15];
+        for(int i=0;i<15;i++)
+        {
+            rawKey1[i] = slaveKey[i];
         }
-        if(newKey == null){
+        int[] rawKey2 = new int[15];
+        for(int i=0;i<15;i++)
+        {
+            rawKey2[i] = slaveKey[15+i];
+        }
+        int[] rawKey3 = new int[15];
+        for(int i=0;i<15;i++)
+        {
+            rawKey3[i] = slaveKey[30+i];
+        }
+        // 每一个aliceSyndrome对应一个bobKey的数组进行信息协调
+
+        String result1 = Utils2.int2String(decoder.myDecode(aliceSyndromes[0], rawKey1, 12));
+        String result2 = Utils2.int2String(decoder.myDecode(aliceSyndromes[1], rawKey2, 12));
+        String result3 = Utils2.int2String(decoder.myDecode(aliceSyndromes[2], rawKey3, 12));
+
+        newKey.append(result1);
+        newKey.append(result2);
+        newKey.append(result3);
+
+
+        if(newKey == null)
+        {
             Log.d(TAG, "infoReconciliation: newKey is null");
             newKey.append("newKey is null");
         }

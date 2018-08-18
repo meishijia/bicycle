@@ -13,13 +13,14 @@ public class MyApplication extends Application {
     private static boolean NTPSucceed;
     //public static final int MSG_REV = 0;
     //public static final int MSG_SEND = 1;
+    private static String rawKey;
+    private static String finalKey;
 
 
     @Override
     public void onCreate(){
         super.onCreate();
         context = getApplicationContext();
-        NTPSucceed = false;
     }
 
     public static Context getContext(){
@@ -37,4 +38,13 @@ public class MyApplication extends Application {
     public static void setNTPSucceed(boolean b){NTPSucceed = b;}
 
     public static boolean getNTPSucceed(){return NTPSucceed;}
+
+    public static String getRawKey() {return rawKey;}
+
+    public static void setRawKey(String key) {rawKey = key;}
+
+    public static String getFinalKey() {return finalKey;}
+
+    public static void setfinalKey(String key) {finalKey = key;}
+
 }

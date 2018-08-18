@@ -42,7 +42,8 @@ public class KeyGenThread extends Thread
         System.loadLibrary("native-lib");
     }
 
-    public  KeyGenThread(Handler handler){
+    public  KeyGenThread(Handler handler)
+    {
         this.mHandler = handler;
     }
 
@@ -92,12 +93,11 @@ public class KeyGenThread extends Thread
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-
-                    Message message = Message.obtain();
-                    message.what = KEY_GEN_SUCCESS_INT;
-                    message.obj = rawKey;
-                    mHandler.sendMessage(message);
-
+                    MyApplication.setRawKey(rawKey);
+                    //Message message = Message.obtain();
+                    //message.what = KEY_GEN_SUCCESS_INT;
+                    //message.obj = rawKey;
+                    mHandler.sendEmptyMessage(KEY_GEN_SUCCESS_INT);
                 }
 
             }
@@ -156,8 +156,8 @@ public class KeyGenThread extends Thread
 
         try{
             float[] signal = load(accDenoisedPath);
-            float[] normalized_z = mapminmax(signal, -10f, 10f);
-            float[] abs_z = abs(normalized_z);
+            //float[] normalized_z = mapminmax(signal, -10f, 10f);
+            float[] abs_z = abs(signal);
             int[] bin_z = bin_thre(abs_z, 2);
             float[] win_z = window(bin_z);
             int[] key = bin_thre(win_z, (float) 0.6);

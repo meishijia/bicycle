@@ -2,6 +2,8 @@ package com.example.admin.keygen.RSCode;
 
 import android.util.Log;
 
+import com.example.admin.keygen.zxingRSCode.GenericGFPoly;
+
 
 public class Utils {
 
@@ -47,6 +49,7 @@ public class Utils {
         //System.out.println(result.toString());
         return result.toString();
     }
+
 
     /**
      * 将Polynomial数组中的所有Polynomial表示成字符串
