@@ -1,5 +1,14 @@
 package com.example.admin.keygen.zxingRSCode;
 
+import android.util.Base64;
+
+import com.example.admin.keygen.application.MyApplication;
+
+import java.security.Key;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
 public class Utils2
 {
     public static GenericGFPoly[] getSyndromePoly(String rawKey)
@@ -70,5 +79,24 @@ public class Utils2
             syndromeBytes[i] = Integer.parseInt(tmp,2);
         }
         return syndromeBytes;
+    }
+
+    public static String getMACDigest(String data)
+    {
+        String resultStr = "";
+        try
+        {
+            Key key = new SecretKeySpec(MyApplication.getFinalKey().getBytes("UTF-8"),"");
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(key);
+            byte[] dataBytes = data.getBytes("UTF-8");
+            byte[] result = mac.doFinal(dataBytes);
+            resultStr = Base64.encodeToString(result,Base64.DEFAULT);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+        return resultStr;
     }
 }

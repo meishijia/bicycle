@@ -30,6 +30,10 @@ import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_REQUEST;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_REQUEST_INT;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_SUCCESS;
 import static com.example.admin.keygen.activity.MainActivity.NTP_SYNC_SUCCESS_INT;
+import static com.example.admin.keygen.activity.MainActivity.PAIRING_FAILED;
+import static com.example.admin.keygen.activity.MainActivity.PAIRING_FAILED_INT;
+import static com.example.admin.keygen.activity.MainActivity.PAIRING_SUCCESS;
+import static com.example.admin.keygen.activity.MainActivity.PAIRING_SUCCESS_INT;
 import static com.example.admin.keygen.activity.MainActivity.SYNDROME_INT;
 
 
@@ -127,6 +131,12 @@ public class ConnectThread extends Thread{
                                 message.what = KEY_CONFIRM_INT;
                                 message.obj = content.substring(11);
                                 mainHandler.sendMessage(message);
+                            }
+                            else if(content.contains(PAIRING_SUCCESS)){
+                                mainHandler.sendEmptyMessage(PAIRING_SUCCESS_INT);
+                            }
+                            else if(content.contains(PAIRING_FAILED)){
+                                mainHandler.sendEmptyMessage(PAIRING_FAILED_INT);
                             }
                             // else the slave received the syndroms
                             else {

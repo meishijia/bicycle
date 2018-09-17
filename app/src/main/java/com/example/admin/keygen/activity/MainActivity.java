@@ -48,22 +48,26 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public final static String TAG = "MainActivity";
 
-    public final static int MSG_SEND = 11;              //发送信息
-    public final static int SEND_MSG_SUCCESS = 12;      //信息发送成功
-    public final static int SEND_MSG_ERROR = 13;        //信息发送错误
+    public final static int MSG_SEND = 10;              //发送信息
+    public final static int SEND_MSG_SUCCESS = 11;      //信息发送成功
+    public final static int SEND_MSG_ERROR = 12;        //信息发送错误
 
-    public final static int DEVICE_CONNECTING = 21;     //有设备正在连接
+    public final static int DEVICE_CONNECTING = 20;     //有设备正在连接
 
-    public final static int NTP_SYNC_REQUEST_INT = 31;  //NTP同步请求
-    public final static int NTP_SYNC_SUCCESS_INT = 32;  //NTP同步成功
-    public final static int NTP_SYNC_FAILED_INT = 33;   //NTP同步失败
-    public final static int KEY_GEN_START_INT = 34;     //开始生成密钥
-    public final static int KEY_GEN_SUCCESS_INT =35;    //密钥生成成功 (MainActivity <- KeyGenThread)
-    public final static int KEY_GEN_FINISHED_INT = 36;  //密钥生成完成
-    public final static int INFO_RECON_START_INT = 37;  //开始信息协调
-    public final static int SYNDROME_INT = 38;          //介绍到syndrome
-    public final static int KEY_CONFIRM_INT = 39;       //密钥验证
-    public final static int END_INT = 40;               //结束通信
+    public final static int NTP_SYNC_REQUEST_INT = 30;  //NTP同步请求
+    public final static int NTP_SYNC_SUCCESS_INT = 31;  //NTP同步成功
+    public final static int NTP_SYNC_FAILED_INT = 32;   //NTP同步失败
+    public final static int KEY_GEN_START_INT = 33;     //开始生成密钥
+    public final static int KEY_GEN_SUCCESS_INT =34;    //密钥生成成功 (MainActivity <- KeyGenThread)
+    public final static int KEY_GEN_FINISHED_INT = 35;  //密钥生成完成
+    public final static int INFO_RECON_START_INT = 36;  //开始信息协调
+    public final static int SYNDROME_INT = 37;          //介绍到syndrome
+    public final static int KEY_CONFIRM_INT = 38;       //密钥验证
+
+    public final static int PAIRING_SUCCESS_INT = 40;   //配对成功
+    public final static int PAIRING_FAILED_INT = 41;
+
+    public final static int END_INT = 50;               //结束通信
 
     public final static String NTP_SYNC_REQUEST = "NTP_SYNC_REQUEST";
     public final static String NTP_SYNC_SUCCESS = "NTP_SYNC_SUCCESS";
@@ -75,6 +79,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public final static String INFO_RECON_START = "IOFO_RECON_START";
     public final static String END = "END";
+
+    public final static String KEY_CONFIRM_MESSAGE = "KEY_CONFIRM_MESSAGE";
+    public final static String PAIRING_SUCCESS = "PAIRING_SUCCESS";
+    public final static String PAIRING_FAILED = "PAIRING_FAILED";
 
     public final static int PORT = 54321;
     public final static String MASTER_SSID = "MASTER";
@@ -466,8 +474,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Log.d(TAG, "handleMessage: isMaster: " + isMaster);
                     if(isMaster)
                     {
-                        Log.d(TAG, "handleMessage: master received the KEY_GEN_SUCCESS_INT");
-                        Log.d(TAG, "handleMessage: message:" + message);
+                        MyApplication.setfinalKey(MyApplication.getRawKey());
                     }
                     //rawKey = message.obj.toString();
                     Log.d(TAG, "rawkey:" + MyApplication.getRawKey() + "\n");
@@ -535,21 +542,41 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     MyApplication.setfinalKey(newKey);
                     newKeyTextView.setText(MyApplication.getFinalKey());
                     //将信息协调之后的新密钥发送给master进行确认，这一步需要改进，可用MAC
-                    Message keyConfirm = getMessage("KeyConfirm:"+MyApplication.getFinalKey());
+                    String digest = Utils2.getMACDigest(KEY_CONFIRM_MESSAGE);
+                    textView.append(digest);
+                    Message keyConfirm = getMessage("KeyConfirm:"+digest);
                     slaveConnectThread.threadHandler.sendMessage(keyConfirm);
                     break;
                 // (master)
                 case KEY_CONFIRM_INT:
                     textView.append("slave send the new key to confirm\n");
-                    String bobKey = message.obj.toString();
-                    Log.d("MainActivity", "bobKey:"+bobKey);
-                    if(MyApplication.getRawKey().equals(bobKey)){
+                    String bobDigest = message.obj.toString();
+                    textView.append(bobDigest + "\n");
+                    Log.d("MainActivity", "bobDigest:"+bobDigest);
+                    String aliceDigest = Utils2.getMACDigest(KEY_CONFIRM_MESSAGE);
+                    textView.append(aliceDigest + "\n");
+                    textView.append("I'm the test string");
+                    Log.d("MainActivity", "aliceDigest:"+aliceDigest);
+                    Message pairingResult;
+                    if(aliceDigest.trim().equals(bobDigest)){
                         progressTextView.setText("Key is same");
+                        pairingResult = getMessage(PAIRING_SUCCESS);
+                        MyApplication.setParingStatus(true);
                     }
                     else{
                         progressTextView.setText("Key is different");
+                        pairingResult = getMessage(PAIRING_FAILED);
+
                     }
+                    masterConnectThread.threadHandler.sendMessage(pairingResult);
                     masterConnectThread.threadHandler.sendMessage(getMessage(END));
+                    break;
+                case PAIRING_SUCCESS_INT:
+                    progressTextView.setText("Key is same");
+                    MyApplication.setParingStatus(true);
+                    break;
+                case PAIRING_FAILED_INT:
+                    progressTextView.setText("Key is different");
                     break;
             }
         }

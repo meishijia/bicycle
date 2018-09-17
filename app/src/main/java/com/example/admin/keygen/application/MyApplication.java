@@ -15,6 +15,7 @@ public class MyApplication extends Application {
     //public static final int MSG_SEND = 1;
     private static String rawKey;
     private static String finalKey;
+    private static boolean pairingSucceed = false;
 
 
     @Override
@@ -47,4 +48,10 @@ public class MyApplication extends Application {
 
     public static void setfinalKey(String key) {finalKey = key;}
 
+    public static boolean pairingSucceed(){return pairingSucceed;}
+
+    public static void setParingStatus(boolean pairingSucceedStatus)
+    {
+        pairingSucceed = pairingSucceedStatus;
+    }
 }
