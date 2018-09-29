@@ -183,6 +183,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 /**
                  * master需要开启热点
                  * 当检测到wifi热点开启时，创建监听线程
+                 * 本意是想避免重启app，但是好像避免不了
+                 * 所以这段代码基本没用，最好还是开启了热点在选择成为master
                  */
                 if("android.net.wifi.WIFI_AP_STATE_CHANGED".equals(action))
                 {
@@ -419,6 +421,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    /**
+     * MainHandler 处理各种消息
+     */
     private class MainHandler extends Handler
     {
         WeakReference<MainActivity> mActicity;
@@ -431,6 +436,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             super.handleMessage(message);
 
             switch (message.what){
+
+                /**
+                 * 当master接收到DEVICE_CONNECTING信息，则初始化一个ConnectThread对象
+                 * 此时master和slave建立齐了socket连接
+                 */
                 // (master) ListenerThread -> MainActivity
                 case DEVICE_CONNECTING:
                     Log.d("MainActivity","DEVICE_CONNECTING message is received");
@@ -548,6 +558,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     slaveConnectThread.threadHandler.sendMessage(keyConfirm);
                     break;
                 // (master)
+                // alice=master  bob=slave
                 case KEY_CONFIRM_INT:
                     textView.append("slave send the new key to confirm\n");
                     String bobDigest = message.obj.toString();
@@ -598,12 +609,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     /**
      * 输入master的syndrome String
      * 输出信息协调后的密钥
+     * 这里的参数写的有些乱，master=alice，bob=slave
      * @param syndrome
      * @return
      */
     public String infoReconciliation(String syndrome) throws Exception
     {
         StringBuffer newKey = new StringBuffer();
+        //首先从alice/master发送的字符串中恢复出alice的syndromes
         int[] syndromeInts = Utils2.string2Ints(syndrome);
         int count = syndromeInts.length;
         int len = count/3;

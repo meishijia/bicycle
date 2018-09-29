@@ -24,6 +24,11 @@ import java.util.Date;
 
 import static com.example.admin.keygen.activity.MainActivity.KEY_GEN_SUCCESS_INT;
 
+/**
+ * 采集加速度数据 并生成密钥
+ * 利用JNI 调用C++实现的小波降噪程序对加速度数据进行降噪
+ * 加速度只涉及到Z轴，并在程序中硬编码了只采集12800组数据（需改进）
+ */
 public class KeyGenThread extends Thread
 {
 

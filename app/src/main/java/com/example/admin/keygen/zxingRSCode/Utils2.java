@@ -51,12 +51,15 @@ public class Utils2
     public static String int2String(int[] data)
     {
         StringBuffer result=new StringBuffer("");
-        for(int i=0;i<data.length;i++) {
+        for(int i=0;i<data.length;i++)
+        {
             String tmp = Integer.toBinaryString(data[i]);
             int tmpLength = tmp.length();
-            if(tmpLength < 4) {
+            if(tmpLength < 4)
+            {
                 StringBuffer sb = new StringBuffer("");
-                for(int j=0;j<4-tmpLength;j++) {
+                for(int j=0;j<4-tmpLength;j++)
+                {
                     sb.append("0");
                 }
                 result.append(sb.toString()+tmp);
@@ -74,7 +77,8 @@ public class Utils2
         int strLength = syndrome.length();
         int count = strLength/4;
         int[] syndromeBytes = new int[count];
-        for(int i=0;i<count;i++){
+        for(int i=0;i<count;i++)
+        {
             String tmp = syndrome.substring(i*4,(i+1)*4);
             syndromeBytes[i] = Integer.parseInt(tmp,2);
         }

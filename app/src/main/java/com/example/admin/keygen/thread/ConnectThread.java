@@ -40,7 +40,7 @@ import static com.example.admin.keygen.activity.MainActivity.SYNDROME_INT;
 /**
  * ConnectThread 将处理来自slave/master的消息，通过判断接受到的消息内容
  * 通过mainHandler向MainActivity返回不同类型的消息
- * 注意：slave和master接受到的消息不相同，当都在本类中处理
+ * 注意：slave和master接受到的消息不相同，但都在本类中处理
  * Created by admin on 2018/7/16.
  */
 
